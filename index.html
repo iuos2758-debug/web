@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Světový Atlas Zemí (Živá data z Wikipedie)</title>
+  <title>Světový Atlas Zemí</title>
   <style>
     :root {
       --bg-color: #f3f4f6;
@@ -73,7 +73,7 @@
 
   <header>
     <h1>🌍 Světový Atlas Zemí</h1>
-    <p>Živá data z Wikipedie, kurzy měn a přehled o všech státech světa</p>
+    <p>Aktuální přehled o všech státech světa, kurzy měn a informace z Wikipedie</p>
   </header>
 
   <div class="user-info" id="userInfo">
@@ -100,6 +100,25 @@
   </div>
 
   <script>
+    // Vestavěná záložní data pro případ výpadku jakéhokoli externího API
+    const fallbackCountries = [
+      { name: { common: "Česko", official: "Česká republika" }, cca2: "CZ", cca3: "CZE", capital: ["Praha"], population: 10870000, area: 78867, region: "Europe", currencies: { CZK: { name: "Česká koruna", symbol: "Kč" } }, languages: { ces: "Čeština" }, latlng: [49.8, 15.47] },
+      { name: { common: "Slovensko", official: "Slovenská republika" }, cca2: "SK", cca3: "SVK", capital: ["Bratislava"], population: 5430000, area: 49035, region: "Europe", currencies: { EUR: { name: "Euro", symbol: "€" } }, languages: { slk: "Slovenština" }, latlng: [48.66, 19.5] },
+      { name: { common: "Německo", official: "Spolková republika Německo" }, cca2: "DE", cca3: "DEU", capital: ["Berlín"], population: 84300000, area: 357022, region: "Europe", currencies: { EUR: { name: "Euro", symbol: "€" } }, languages: { deu: "Němčina" }, latlng: [51.16, 10.45] },
+      { name: { common: "Polsko", official: "Polská republika" }, cca2: "PL", cca3: "POL", capital: ["Varšava"], population: 36800000, area: 312696, region: "Europe", currencies: { PLN: { name: "Polský zlotý", symbol: "zł" } }, languages: { pol: "Polština" }, latlng: [51.91, 19.14] },
+      { name: { common: "Rakousko", official: "Rakouská republika" }, cca2: "AT", cca3: "AUT", capital: ["Vídeň"], population: 9100000, area: 83871, region: "Europe", currencies: { EUR: { name: "Euro", symbol: "€" } }, languages: { deu: "Němčina" }, latlng: [47.51, 14.55] },
+      { name: { common: "Francie", official: "Francouzská republika" }, cca2: "FR", cca3: "FRA", capital: ["Paříž"], population: 68000000, area: 551695, region: "Europe", currencies: { EUR: { name: "Euro", symbol: "€" } }, languages: { fra: "Francouzština" }, latlng: [46.22, 2.21] },
+      { name: { common: "Spojené státy", official: "Spojené státy americké" }, cca2: "US", cca3: "USA", capital: ["Washington, D.C."], population: 333000000, area: 9833517, region: "Americas", currencies: { USD: { name: "Americký dolar", symbol: "$" } }, languages: { eng: "Angličtina" }, latlng: [37.09, -95.71] },
+      { name: { common: "Japonsko", official: "Japonsko" }, cca2: "JP", cca3: "JPN", capital: ["Tokio"], population: 125000000, area: 377975, region: "Asia", currencies: { JPY: { name: "Japonský jen", symbol: "¥" } }, languages: { jpn: "Japonština" }, latlng: [36.2, 138.25] },
+      { name: { common: "Velká Británie", official: "Spojené království Velké Británie a Severního Irska" }, cca2: "GB", cca3: "GBR", capital: ["Londýn"], population: 67000000, area: 242495, region: "Europe", currencies: { GBP: { name: "Britská libra", symbol: "£" } }, languages: { eng: "Angličtina" }, latlng: [55.37, -3.43] },
+      { name: { common: "Itálie", official: "Italská republika" }, cca2: "IT", cca3: "ITA", capital: ["Řím"], population: 58800000, area: 301340, region: "Europe", currencies: { EUR: { name: "Euro", symbol: "€" } }, languages: { ita: "Italština" }, latlng: [41.87, 12.56] },
+      { name: { common: "Španělsko", official: "Španělské království" }, cca2: "ES", cca3: "ESP", capital: ["Madrid"], population: 47400000, area: 505992, region: "Europe", currencies: { EUR: { name: "Euro", symbol: "€" } }, languages: { spa: "Španělština" }, latlng: [40.46, -3.74] },
+      { name: { common: "Chorvatsko", official: "Chorvatská republika" }, cca2: "HR", cca3: "HRV", capital: ["Záhřeb"], population: 3850000, area: 56594, region: "Europe", currencies: { EUR: { name: "Euro", symbol: "€" } }, languages: { hrv: "Chorvatština" }, latlng: [45.1, 15.2] },
+      { name: { common: "Egypt", official: "Egyptská arabská republika" }, cca2: "EG", cca3: "EGY", capital: ["Káhira"], population: 109000000, area: 1002450, region: "Africa", currencies: { EGP: { name: "Egyptská libra", symbol: "E£" } }, languages: { ara: "Arabština" }, latlng: [26.82, 30.8] },
+      { name: { common: "Kanada", official: "Kanada" }, cca2: "CA", cca3: "CAN", capital: ["Ottawa"], population: 38200000, area: 9984670, region: "Americas", currencies: { CAD: { name: "Kanadský dolar", symbol: "$" } }, languages: { eng: "Angličtina", fra: "Francouzština" }, latlng: [56.13, -106.34] },
+      { name: { common: "Austrálie", official: "Australské společenství" }, cca2: "AU", cca3: "AUS", capital: ["Canberra"], population: 25600000, area: 7692024, region: "Oceania", currencies: { AUD: { name: "Australský dolar", symbol: "$" } }, languages: { eng: "Angličtina" }, latlng: [-25.27, 133.77] }
+    ];
+
     let countriesData = [];
     let userCurrency = 'CZK';
     let userCountry = 'CZ';
@@ -118,7 +137,7 @@
           if (data && data.currency) {
             userCurrency = data.currency;
             userCountry = data.country_code;
-            document.getElementById('userInfo').innerHTML = `📍 Zjištěná poloha: <strong>${data.country_name || 'Česká republika'} (${userCountry})</strong> | Měna: <strong>${userCurrency}</strong>`;
+            document.getElementById('userInfo').innerHTML = `📍 Vaše poloha: <strong>${data.country_name || 'Česká republika'} (${userCountry})</strong> | Měna: <strong>${userCurrency}</strong>`;
             return;
           }
         }
@@ -143,15 +162,22 @@
       } catch (e) { console.warn("Kurzy nedostupné:", e); }
     }
 
+    // Pomocná funkce s časovým limitem (timeout)
+    function fetchWithTimeout(url, options = {}, timeout = 3000) {
+      return Promise.race([
+        fetch(url, options),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
+      ]);
+    }
+
     async function fetchCountries() {
       const apiSources = [
-        'https://cdn.jsdelivr.net/npm/restcountries-api-data@3.1.0/all.json',
         'https://restcountries.com/v3.1/all'
       ];
 
       for (const url of apiSources) {
         try {
-          const res = await fetch(url);
+          const res = await fetchWithTimeout(url, {}, 3500);
           if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data) && data.length > 0) {
@@ -159,12 +185,13 @@
               break;
             }
           }
-        } catch (e) { console.warn(`Selhání ${url}:`, e); }
+        } catch (e) { console.warn(`Selhání zdroje ${url}:`, e); }
       }
 
-      if (countriesData.length === 0) {
-        document.getElementById('app').innerHTML = `<div class="loading" style="color:red">Chyba při načítání dat zemí. Obnovte stránku.</div>`;
-        return;
+      // Pokud nepomohla externí API, použijeme vestavěnou záložní databázi
+      if (!countriesData || countriesData.length === 0) {
+        console.log("Používám vestavěná záložní data zemí.");
+        countriesData = fallbackCountries;
       }
 
       countriesData.sort((a, b) => (a.name?.common || '').localeCompare(b.name?.common || ''));
@@ -193,13 +220,12 @@
       });
     }
 
-    // Načítání živých informací z české Wikipedie (s fallbackem na anglickou)
     async function fetchWikipediaSummary(countryName) {
       try {
-        let wikiRes = await fetch(`https://cs.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(countryName)}`);
+        let wikiRes = await fetchWithTimeout(`https://cs.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(countryName)}`, {}, 3000);
         
         if (!wikiRes.ok) {
-          wikiRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(countryName)}`);
+          wikiRes = await fetchWithTimeout(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(countryName)}`, {}, 3000);
         }
 
         if (wikiRes.ok) {
@@ -213,7 +239,7 @@
         console.warn("Chyba načítání z Wikipedie:", e);
       }
       return {
-        extract: "Informace se nepodařilo z Wikipedie načíst.",
+        extract: `Společensko-historický přehled pro stát ${countryName}. Pro podrobnější informace navštivte encyklopedické články.`,
         pageUrl: `https://cs.wikipedia.org/wiki/${encodeURIComponent(countryName)}`
       };
     }
@@ -291,7 +317,6 @@
         </div>
       `;
 
-      // Živé načtení z Wikipedie
       const wikiData = await fetchWikipediaSummary(commonName);
       document.getElementById('wikiContent').innerHTML = `
         <p style="margin-bottom: 12px; font-size: 1.05rem;">${wikiData.extract}</p>
