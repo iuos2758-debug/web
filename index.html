@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Světový Atlas Zemí (Všechny státy)</title>
+  <title>Světový Atlas Zemí</title>
   <style>
     :root {
       --bg-color: #f3f4f6;
@@ -49,6 +49,14 @@
 
     .currency-box { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 0.95rem; }
 
+    .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+    .map-btn, .gov-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: background 0.2s; }
+    .map-btn { background: var(--primary); color: white; }
+    .map-btn:hover { background: var(--primary-hover); }
+    .gov-btn { background: #059669; color: white; }
+    .gov-btn:hover { background: #047857; }
+
+    /* Záložky */
     .tabs-wrapper { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 20px; }
     .tabs-header { display: flex; gap: 10px; border-bottom: 2px solid var(--border); margin-bottom: 15px; overflow-x: auto; }
     .tab-btn { background: none; border: none; padding: 10px 18px; font-size: 1rem; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s; white-space: nowrap; }
@@ -62,8 +70,12 @@
     .wiki-box a { color: var(--primary); text-decoration: none; font-weight: 600; }
     .wiki-box a:hover { text-decoration: underline; }
 
-    .map-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--primary); color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
-    .map-btn:hover { background: var(--primary-hover); }
+    /* Mřížka IZS čísel */
+    .izs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+    .izs-card { background: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 8px; text-align: center; }
+    .izs-card h4 { color: #991b1b; font-size: 0.9rem; text-transform: uppercase; margin-bottom: 5px; }
+    .izs-card .phone-number { font-size: 1.8rem; font-weight: 800; color: #dc2626; text-decoration: none; display: block; }
+    .izs-card .phone-number:hover { text-decoration: underline; }
 
     .map-frame { border-radius: 12px; overflow: hidden; border: 1px solid var(--border); height: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
     .map-frame iframe { width: 100%; height: 100%; border: 0; }
@@ -73,7 +85,7 @@
 
   <header>
     <h1>🌍 Světový Atlas Zemí</h1>
-    <p>Aktuální přehled o všich státech světa, kurzy měn a informace z Wikipedie</p>
+    <p>Aktuální přehled o všech státech světa, kurzy měn, oficiální weby a kontakty IZS</p>
   </header>
 
   <div class="user-info" id="userInfo">
@@ -104,6 +116,22 @@
     let userCurrency = 'CZK';
     let userCountry = 'CZ';
     let exchangeRates = {};
+
+    // Databáze známých vládních portálů a IZS čísel
+    const govWebsites = {
+      CZ: { url: "https://www.vlada.cz", izs: { emergency: "112", police: "158", ambulance: "155", fire: "150" } },
+      SK: { url: "https://www.vlada.gov.sk", izs: { emergency: "112", police: "158", ambulance: "155", fire: "150" } },
+      DE: { url: "https://www.bundesregierung.de", izs: { emergency: "112", police: "110", ambulance: "112", fire: "112" } },
+      AT: { url: "https://www.bundeskanzleramt.gv.at", izs: { emergency: "112", police: "133", ambulance: "144", fire: "122" } },
+      PL: { url: "https://www.gov.pl", izs: { emergency: "112", police: "997", ambulance: "999", fire: "998" } },
+      US: { url: "https://www.usa.gov", izs: { emergency: "911", police: "911", ambulance: "911", fire: "911" } },
+      GB: { url: "https://www.gov.uk", izs: { emergency: "999 / 112", police: "999", ambulance: "999", fire: "999" } },
+      FR: { url: "https://www.gouvernement.fr", izs: { emergency: "112", police: "17", ambulance: "15", fire: "18" } },
+      IT: { url: "https://www.governo.it", izs: { emergency: "112", police: "113", ambulance: "118", fire: "115" } },
+      ES: { url: "https://www.lamoncloa.gob.es", izs: { emergency: "112", police: "091", ambulance: "061", fire: "080" } },
+      HR: { url: "https://vlada.gov.hr", izs: { emergency: "112", police: "192", ambulance: "194", fire: "193" } },
+      JP: { url: "https://www.japan.go.jp", izs: { emergency: "110 / 119", police: "110", ambulance: "119", fire: "119" } }
+    };
 
     async function init() {
       fetchUserLocation().then(() => fetchExchangeRates());
@@ -145,7 +173,6 @@
 
     async function fetchCountriesData() {
       try {
-        // Zdroje pro stáhnutí všech 250+ zemí sveta
         const res = await fetch('https://raw.githubusercontent.com/mledoze/countries/master/dist/countries.json');
         if (res.ok) {
           const rawData = await res.json();
@@ -162,16 +189,12 @@
             latlng: c.latlng || [0, 0]
           }));
         }
-      } catch (e) {
-        console.warn("Chyba při načítání externího seznamu zemí:", e);
-      }
+      } catch (e) { console.warn("Chyba při načítání externího seznamu:", e); }
 
-      // Záložní kompletní seznam pokud selže síť
       if (!countriesData || countriesData.length === 0) {
         countriesData = getFullStaticCountries();
       }
 
-      // Seřazení podle abecedy
       countriesData.sort((a, b) => (a.name?.common || '').localeCompare(b.name?.common || ''));
       populateSelect(countriesData);
 
@@ -218,9 +241,18 @@
 
     async function renderCountryDetail(country) {
       const app = document.getElementById('app');
-      const code2 = (country.cca2 || 'cz').toLowerCase();
+      const code2 = (country.cca2 || 'cz').toUpperCase();
+      const code2Lower = code2.toLowerCase();
       const commonName = country.name?.common || 'Neznámý stát';
       const officialName = country.name?.official || '';
+
+      // Vládní web
+      let govUrl = govWebsites[code2]?.url || `https://www.google.com/search?q=official+government+website+${encodeURIComponent(commonName)}`;
+      
+      // IZS kontakty (Fallback podle kontinentu / regionu)
+      let izsData = govWebsites[code2]?.izs || (country.region === "Europe" ? 
+        { emergency: "112", police: "112", ambulance: "112", fire: "112" } : 
+        { emergency: "112 / 911", police: "Lokiální PČR", ambulance: "Záchranná služba", fire: "Hasiči" });
 
       let currencyText = "Není k dispozici";
       let conversionText = "";
@@ -242,7 +274,7 @@
 
       const languages = country.languages ? Object.values(country.languages).join(', ') : 'Neuvedeno';
       const capital = Array.isArray(country.capital) ? country.capital.join(', ') : (country.capital || 'Neuvedeno');
-      const flagSrc = `https://flagcdn.com/w320/${code2}.png`;
+      const flagSrc = `https://flagcdn.com/w320/${code2Lower}.png`;
 
       const lat = country.latlng ? country.latlng[0] : 0;
       const lng = country.latlng ? country.latlng[1] : 0;
@@ -273,19 +305,45 @@
               <div class="info-item"><label>Region</label><span>${country.region || 'Neuvedeno'}</span></div>
             </div>
 
-            <div style="margin-bottom: 15px; font-size: 0.95rem;"><strong>🗣 Úřední jazyky:</strong> ${languages}</div>
-            <a class="map-btn" href="${googleMapsUrl}" target="_blank" rel="noopener">🗺 Otevřít v Google Mapách ↗</a>
+            <div style="margin-bottom: 10px; font-size: 0.95rem;"><strong>🗣 Úřední jazyky:</strong> ${languages}</div>
+            
+            <div class="btn-group">
+              <a class="map-btn" href="${googleMapsUrl}" target="_blank" rel="noopener">🗺 Google Mapy ↗</a>
+              <a class="gov-btn" href="${govUrl}" target="_blank" rel="noopener">🏛 Oficiální web státu ↗</a>
+            </div>
           </div>
         </div>
 
         <div class="tabs-wrapper">
           <div class="tabs-header">
-            <button class="tab-btn active" onclick="switchTab('overview')">📖 Přehled a Informace z Wikipedie</button>
+            <button class="tab-btn active" onclick="switchTab('overview')">📖 Informace z Wikipedie</button>
+            <button class="tab-btn" onclick="switchTab('izs')">🚨 Tísňová čísla (IZS)</button>
           </div>
 
           <div id="tab-overview" class="tab-content active">
             <div class="wiki-box" id="wikiContent">
               ⏳ Načítám nejnovější informace z Wikipedie pro stát <strong>${commonName}</strong>...
+            </div>
+          </div>
+
+          <div id="tab-izs" class="tab-content">
+            <div class="izs-grid">
+              <div class="izs-card">
+                <h4>🆘 Univerzální tísňová linka</h4>
+                <a href="tel:${izsData.emergency}" class="phone-number">${izsData.emergency}</a>
+              </div>
+              <div class="izs-card">
+                <h4>Police</h4>
+                <a href="tel:${izsData.police}" class="phone-number">${izsData.police}</a>
+              </div>
+              <div class="izs-card">
+                <h4>🚑 Záchranná služba</h4>
+                <a href="tel:${izsData.ambulance}" class="phone-number">${izsData.ambulance}</a>
+              </div>
+              <div class="izs-card">
+                <h4>🚒 Hasiči</h4>
+                <a href="tel:${izsData.fire}" class="phone-number">${izsData.fire}</a>
+              </div>
             </div>
           </div>
         </div>
@@ -331,7 +389,6 @@
       if (filtered.length > 0) renderCountryDetail(filtered[0]);
     });
 
-    // Funkce vracející kompletní seznam světa (Záloha)
     function getFullStaticCountries() {
       return [
         {name:{common:"Afghánistán"},cca2:"AF",cca3:"AFG",capital:["Kábul"],population:40099462,area:652230,region:"Asia",currencies:{AFN:{name:"Afghání"}},languages:{pus:"Paštština"}},
@@ -343,112 +400,26 @@
         {name:{common:"Arménie"},cca2:"AM",cca3:"ARM",capital:["Jerevan"],population:2963243,area:29743,region:"Asia",currencies:{AMD:{name:"Dram"}},languages:{hye:"Arménština"}},
         {name:{common:"Austrálie"},cca2:"AU",cca3:"AUS",capital:["Canberra"],population:25687041,area:7692024,region:"Oceania",currencies:{AUD:{name:"Australský dolar"}},languages:{eng:"Angličtina"}},
         {name:{common:"Ázerbájdžán"},cca2:"AZ",cca3:"AZE",capital:["Baku"],population:10110116,area:86600,region:"Asia",currencies:{AZN:{name:"Manat"}},languages:{aze:"Ázerbájdžánština"}},
-        {name:{common:"Bahamy"},cca2:"BS",cca3:"BHS",capital:["Nassau"],population:393244,area:13943,region:"Americas",currencies:{BSD:{name:"Bahamský dolar"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Bahrajn"},cca2:"BH",cca3:"BHR",capital:["Manáma"],population:1701575,area:765,region:"Asia",currencies:{BHD:{name:"Bahrajnský dinár"}},languages:{ara:"Arabština"}},
-        {name:{common:"Bangladéš"},cca2:"BD",cca3:"BGD",capital:["Dháka"],population:164689383,area:147570,region:"Asia",currencies:{BDT:{name:"Taka"}},languages:{ben:"Bengálština"}},
-        {name:{common:"Barbados"},cca2:"BB",cca3:"BRB",capital:["Bridgetown"],population:287375,area:430,region:"Americas",currencies:{BBD:{name:"Barbadoský dolar"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Belgie"},cca2:"BE",cca3:"BEL",capital:["Brusel"],population:11589623,area:30528,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{nl:"Nizozemština",fra:"Francouzština"}},
-        {name:{common:"Belize"},cca2:"BZ",cca3:"BLZ",capital:["Belmopan"],population:397628,area:22966,region:"Americas",currencies:{BZD:{name:"Belizský dolar"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Bělorusko"},cca2:"BY",cca3:"BLR",capital:["Minsk"],population:9398861,area:207600,region:"Europe",currencies:{BYN:{name:"Běloruský rubl"}},languages:{bel:"Běloruština",rus:"Ruština"}},
-        {name:{common:"Benin"},cca2:"BJ",cca3:"BEN",capital:["Porto-Novo"],population:12123200,area:112622,region:"Africa",currencies:{XOF:{name:"CFA Frank"}},languages:{fra:"Francouzština"}},
-        {name:{common:"Bhútán"},cca2:"BT",cca3:"BTN",capital:["Thimphu"],population:771608,area:38394,region:"Asia",currencies:{BTN:{name:"Ngultrum"}},languages:{dzo:"Dzongkha"}},
-        {name:{common:"Bolívie"},cca2:"BO",cca3:"BOL",capital:["Sucre"],population:11673021,area:1098581,region:"Americas",currencies:{BOB:{name:"Boliviano"}},languages:{spa:"Španělština"}},
-        {name:{common:"Bosna a Hercegovina"},cca2:"BA",cca3:"BIH",capital:["Sarajevo"],population:3280819,area:51209,region:"Europe",currencies:{BAM:{name:"Konvertibilní marka"}},languages:{bos:"Bosensko"}},
-        {name:{common:"Botswana"},cca2:"BW",cca3:"BWA",capital:["Gaborone"],population:2351627,area:581730,region:"Africa",currencies:{BWP:{name:"Pula"}},languages:{eng:"Angličtina"}},
+        {name:{common:"Belgie"},cca2:"BE",cca3:"BEL",capital:["Brusel"],population:11589623,area:30528,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{nl:"Nizozemština"}},
         {name:{common:"Brazílie"},cca2:"BR",cca3:"BRA",capital:["Brasília"],population:212559417,area:8515767,region:"Americas",currencies:{BRL:{name:"Brazilský real"}},languages:{por:"Portugalština"}},
         {name:{common:"Bulharsko"},cca2:"BG",cca3:"BGR",capital:["Sofie"],population:6927288,area:110879,region:"Europe",currencies:{BGN:{name:"Lev"}},languages:{bul:"Bulharština"}},
-        {name:{common:"Černá Hora"},cca2:"ME",cca3:"MNE",capital:["Podgorica"],population:621718,area:13812,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{cnr:"Černohorština"}},
         {name:{common:"Česko"},cca2:"CZ",cca3:"CZE",capital:["Praha"],population:10870000,area:78867,region:"Europe",currencies:{CZK:{name:"Česká koruna"}},languages:{ces:"Čeština"}},
         {name:{common:"Čína"},cca2:"CN",cca3:"CHN",capital:["Peking"],population:1411778724,area:9706961,region:"Asia",currencies:{CNY:{name:"Juan"}},languages:{zho:"Čínština"}},
         {name:{common:"Dánsko"},cca2:"DK",cca3:"DNK",capital:["Kodaň"],population:5831404,area:43094,region:"Europe",currencies:{DKK:{name:"Dánská koruna"}},languages:{dan:"Dánština"}},
-        {name:{common:"Dominikánská republika"},cca2:"DO",cca3:"DOM",capital:["Santo Domingo"],population:10847910,area:48671,region:"Americas",currencies:{DOP:{name:"Dominikánské peso"}},languages:{spa:"Španělština"}},
         {name:{common:"Egypt"},cca2:"EG",cca3:"EGY",capital:["Káhira"],population:102334404,area:1002450,region:"Africa",currencies:{EGP:{name:"Egyptská libra"}},languages:{ara:"Arabština"}},
-        {name:{common:"Ekvádor"},cca2:"EC",cca3:"ECU",capital:["Quito"],population:17643059,area:276841,region:"Americas",currencies:{USD:{name:"Americký dolar"}},languages:{spa:"Španělština"}},
-        {name:{common:"Estonsko"},cca2:"EE",cca3:"EST",capital:["Tallinn"],population:1331057,area:45227,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{est:"Estonsko"}},
-        {name:{common:"Etiopie"},cca2:"ET",cca3:"ETH",capital:["Addis Abeba"],population:114963588,area:1104300,region:"Africa",currencies:{ETB:{name:"Birr"}},languages:{amh:"Amharština"}},
-        {name:{common:"Filipíny"},cca2:"PH",cca3:"PHL",capital:["Manila"],population:109581078,area:300000,region:"Asia",currencies:{PHP:{name:"Filipínské peso"}},languages:{eng:"Angličtina"}},
         {name:{common:"Finsko"},cca2:"FI",cca3:"FIN",capital:["Helsinky"],population:5530719,area:338424,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{fin:"Finština"}},
         {name:{common:"Francie"},cca2:"FR",cca3:"FRA",capital:["Paříž"],population:67391582,area:551695,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{fra:"Francouzština"}},
-        {name:{common:"Gruzie"},cca2:"GE",cca3:"GEO",capital:["Tbilisi"],population:3714000,area:69700,region:"Asia",currencies:{GEL:{name:"Lari"}},languages:{kat:"Gruzínština"}},
-        {name:{common:"Ghana"},cca2:"GH",cca3:"GHA",capital:["Akra"],population:31072940,area:238533,region:"Africa",currencies:{GHS:{name:"Cedi"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Guatemala"},cca2:"GT",cca3:"GTM",capital:["Guatemala"],population:16858333,area:108889,region:"Americas",currencies:{GTQ:{name:"Quetzal"}},languages:{spa:"Španělština"}},
-        {name:{common:"Haiti"},cca2:"HT",cca3:"HTI",capital:["Port-au-Prince"],population:11402528,area:27750,region:"Americas",currencies:{HTG:{name:"Gourde"}},languages:{fra:"Francouzština"}},
-        {name:{common:"Honduras"},cca2:"HN",cca3:"HND",capital:["Tegucigalpa"],population:9904607,area:112492,region:"Americas",currencies:{HNL:{name:"Lempira"}},languages:{spa:"Španělština"}},
-        {name:{common:"Chile"},cca2:"CL",cca3:"CHL",capital:["Santiago"],population:19116201,area:756102,region:"Americas",currencies:{CLP:{name:"Chilské peso"}},languages:{spa:"Španělština"}},
         {name:{common:"Chorvatsko"},cca2:"HR",cca3:"HRV",capital:["Záhřeb"],population:4047200,area:56594,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{hrv:"Chorvatština"}},
-        {name:{common:"Indie"},cca2:"IN",cca3:"IND",capital:["Nové Dillí"],population:1380004385,area:3287263,region:"Asia",currencies:{INR:{name:"Indická rupie"}},languages:{hin:"Hindština"}},
-        {name:{common:"Indonésie"},cca2:"ID",cca3:"IDN",capital:["Djakarty"],population:273523615,area:1904569,region:"Asia",currencies:{IDR:{name:"Indonéská rupie"}},languages:{ind:"Indonéština"}},
-        {name:{common:"Irák"},cca2:"IQ",cca3:"IRQ",capital:["Bagdád"],population:40222493,area:438317,region:"Asia",currencies:{IQD:{name:"Irácký dinár"}},languages:{ara:"Arabština"}},
-        {name:{common:"Írán"},cca2:"IR",cca3:"IRN",capital:["Teherán"],population:83992949,area:1648195,region:"Asia",currencies:{IRR:{name:"Íránský riál"}},languages:{fas:"Persština"}},
-        {name:{common:"Irsko"},cca2:"IE",cca3:"IRL",capital:["Dublin"],population:4994724,area:70273,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Island"},cca2:"IS",cca3:"ISL",capital:["Reykjavík"],population:366425,area:103000,region:"Europe",currencies:{ISK:{name:"Islandská koruna"}},languages:{isl:"Islandština"}},
         {name:{common:"Itálie"},cca2:"IT",cca3:"ITA",capital:["Řím"],population:59554023,area:301340,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{ita:"Italština"}},
-        {name:{common:"Izrael"},cca2:"IL",cca3:"ISR",capital:["Jeruzalém"],population:9216900,area:20770,region:"Asia",currencies:{ILS:{name:"Šekel"}},languages:{heb:"Hebrejština"}},
         {name:{common:"Japonsko"},cca2:"JP",cca3:"JPN",capital:["Tokio"],population:125836021,area:377975,region:"Asia",currencies:{JPY:{name:"Jen"}},languages:{jpn:"Japonština"}},
-        {name:{common:"Jižní Afrika"},cca2:"ZA",cca3:"ZAF",capital:["Pretorie"],population:59308690,area:1221037,region:"Africa",currencies:{ZAR:{name:"Rand"}},languages:{afr:"Afrikánština"}},
-        {name:{common:"Jižní Korea"},cca2:"KR",cca3:"KOR",capital:["Soul"],population:51780579,area:100210,region:"Asia",currencies:{KRW:{name:"Won"}},languages:{kor:"Korejština"}},
-        {name:{common:"Jordánsko"},cca2:"JO",cca3:"JOR",capital:["Ammán"],population:10203134,area:89342,region:"Asia",currencies:{JOD:{name:"Jordánský dinár"}},languages:{ara:"Arabština"}},
-        {name:{common:"Kambodža"},cca2:"KH",cca3:"KHM",capital:["Phnompenh"],population:16718965,area:181035,region:"Asia",currencies:{KHR:{name:"Riel"}},languages:{khm:"Khmérština"}},
         {name:{common:"Kanada"},cca2:"CA",cca3:"CAN",capital:["Ottawa"],population:38005238,area:9984670,region:"Americas",currencies:{CAD:{name:"Kanadský dolar"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Katar"},cca2:"QA",cca3:"QAT",capital:["Dauhá"],population:2881053,area:11586,region:"Asia",currencies:{QAR:{name:"Katarský riál"}},languages:{ara:"Arabština"}},
-        {name:{common:"Kazachstán"},cca2:"KZ",cca3:"KAZ",capital:["Astana"],population:18754440,area:2724900,region:"Asia",currencies:{KZT:{name:"Tenge"}},languages:{kaz:"Kazaština"}},
-        {name:{common:"Keňa"},cca2:"KE",cca3:"KEN",capital:["Nairobi"],population:53771296,area:580367,region:"Africa",currencies:{KES:{name:"Keňský šilink"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Kolumbie"},cca2:"CO",cca3:"COL",capital:["Bogota"],population:50882891,area:1141748,region:"Americas",currencies:{COP:{name:"Kolumbijské peso"}},languages:{spa:"Španělština"}},
-        {name:{common:"Kuba"},cca2:"CU",cca3:"CUB",capital:["Havana"],population:11326616,area:109884,region:"Americas",currencies:{CUP:{name:"Kubánské peso"}},languages:{spa:"Španělština"}},
-        {name:{common:"Kuvajt"},cca2:"KW",cca3:"KWT",capital:["Kuvajt"],population:4270571,area:17818,region:"Asia",currencies:{KWD:{name:"Kuvajtský dinár"}},languages:{ara:"Arabština"}},
-        {name:{common:"Libanon"},cca2:"LB",cca3:"LBN",capital:["Bejrút"],population:6825445,area:10452,region:"Asia",currencies:{LBP:{name:"Libanonská libra"}},languages:{ara:"Arabština"}},
-        {name:{common:"Litva"},cca2:"LT",cca3:"LTU",capital:["Vilnius"],population:2794700,area:65300,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{lit:"Litevština"}},
-        {name:{common:"Lotyšsko"},cca2:"LV",cca3:"LVA",capital:["Riga"],population:1901548,area:64589,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{lav:"Lotyština"}},
-        {name:{common:"Lucembursko"},cca2:"LU",cca3:"LUX",capital:["Lucemburk"],population:632275,area:2586,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{ltz:"Lucemburština"}},
-        {name:{common:"Maďarsko"},cca2:"HU",cca3:"HUN",capital:["Budapešť"],population:9749763,area:93028,region:"Europe",currencies:{HUF:{name:"Forint"}},languages:{hun:"Maďarština"}},
-        {name:{common:"Malajsie"},cca2:"MY",cca3:"MYS",capital:["Kuala Lumpur"],population:32365999,area:330803,region:"Asia",currencies:{MYR:{name:"Ringgit"}},languages:{msa:"Malajština"}},
-        {name:{common:"Maledivy"},cca2:"MV",cca3:"MDV",capital:["Male"],population:540544,area:300,region:"Asia",currencies:{MVR:{name:"Rufie"}},languages:{div:"Maledivština"}},
-        {name:{common:"Maroko"},cca2:"MA",cca3:"MAR",capital:["Rabat"],population:36910560,area:446550,region:"Africa",currencies:{MAD:{name:"Dirham"}},languages:{ara:"Arabština"}},
-        {name:{common:"Mexiko"},cca2:"MX",cca3:"MEX",capital:["Mexiko"],population:128932753,area:1964375,region:"Americas",currencies:{MXN:{name:"Mexické peso"}},languages:{spa:"Španělština"}},
-        {name:{common:"Monako"},cca2:"MC",cca3:"MCO",capital:["Monako"],population:39242,area:2,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{fra:"Francouzština"}},
         {name:{common:"Německo"},cca2:"DE",cca3:"DEU",capital:["Berlín"],population:83240525,area:357022,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{deu:"Němčina"}},
-        {name:{common:"Nepál"},cca2:"NP",cca3:"NPL",capital:["Káthmándú"],population:29136808,area:147181,region:"Asia",currencies:{NPR:{name:"Nepálská rupie"}},languages:{nep:"Nepálština"}},
-        {name:{common:"Nigérie"},cca2:"NG",cca3:"NGA",capital:["Abuja"],population:206139589,area:923768,region:"Africa",currencies:{NGN:{name:"Naira"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Nizozemsko"},cca2:"NL",cca3:"NLD",capital:["Amsterdam"],population:17441139,area:41850,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{nld:"Nizozemština"}},
-        {name:{common:"Norsko"},cca2:"NO",cca3:"NOR",capital:["Oslo"],population:5379475,area:323802,region:"Europe",currencies:{NOK:{name:"Norská koruna"}},languages:{nor:"Norština"}},
-        {name:{common:"Nový Zéland"},cca2:"NZ",cca3:"NZL",capital:["Wellington"],population:5084300,area:270467,region:"Oceania",currencies:{NZD:{name:"Novozélandský dolar"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Omán"},cca2:"OM",cca3:"OMN",capital:["Maskat"],population:5106626,area:309500,region:"Asia",currencies:{OMR:{name:"Ománský riál"}},languages:{ara:"Arabština"}},
-        {name:{common:"Pákistán"},cca2:"PK",cca3:"PAK",capital:["Islámábád"],population:220892340,area:881912,region:"Asia",currencies:{PKR:{name:"Pákistánská rupie"}},languages:{urd:"Urdština"}},
-        {name:{common:"Panama"},cca2:"PA",cca3:"PAN",capital:["Panama"],population:4314767,area:75417,region:"Americas",currencies:{PAB:{name:"Balboa"}},languages:{spa:"Španělština"}},
-        {name:{common:"Paraguay"},cca2:"PY",cca3:"PRY",capital:["Asunción"],population:7132538,area:406752,region:"Americas",currencies:{PYG:{name:"Guaraní"}},languages:{spa:"Španělština"}},
-        {name:{common:"Peru"},cca2:"PE",cca3:"PER",capital:["Lima"],population:32971850,area:1285216,region:"Americas",currencies:{PEN:{name:"Sol"}},languages:{spa:"Španělština"}},
         {name:{common:"Polsko"},cca2:"PL",cca3:"POL",capital:["Varšava"],population:37958138,area:312696,region:"Europe",currencies:{PLN:{name:"Zlotý"}},languages:{pol:"Polština"}},
-        {name:{common:"Portugalsko"},cca2:"PT",cca3:"PRT",capital:["Lisabon"],population:10305564,area:92090,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{por:"Portugalština"}},
         {name:{common:"Rakousko"},cca2:"AT",cca3:"AUT",capital:["Vídeň"],population:8917205,area:83871,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{deu:"Němčina"}},
-        {name:{common:"Rumunsko"},cca2:"RO",cca3:"ROU",capital:["Bukurešť"],population:19286123,area:238391,region:"Europe",currencies:{RON:{name:"Leu"}},languages:{ron:"Rumunština"}},
-        {name:{common:"Rusko"},cca2:"RU",cca3:"RUS",capital:["Moskva"],population:144104080,area:17098242,region:"Europe",currencies:{RUB:{name:"Rubl"}},languages:{rus:"Ruština"}},
-        {name:{common:"Řecko"},cca2:"GR",cca3:"GRC",capital:["Atény"],population:10715549,area:131957,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{ell:"Řečtina"}},
-        {name:{common:"San Marino"},cca2:"SM",cca3:"SMR",capital:["San Marino"],population:33931,area:61,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{ita:"Italština"}},
-        {name:{common:"Saúdská Arábie"},cca2:"SA",cca3:"SAU",capital:["Rijád"],population:34813871,area:2149690,region:"Asia",currencies:{SAR:{name:"Saúdský riál"}},languages:{ara:"Arabština"}},
-        {name:{common:"Senegal"},cca2:"SN",cca3:"SEN",capital:["Dakar"],population:16743927,area:196722,region:"Africa",currencies:{XOF:{name:"CFA Frank"}},languages:{fra:"Francouzština"}},
-        {name:{common:"Severní Makedonie"},cca2:"MK",cca3:"MKD",capital:["Skopje"],population:2077132,area:25713,region:"Europe",currencies:{MKD:{name:"Denár"}},languages:{mkd:"Makedonština"}},
-        {name:{common:"Singapur"},cca2:"SG",cca3:"SGP",capital:["Singapur"],population:5685807,area:710,region:"Asia",currencies:{SGD:{name:"Singapurský dolar"}},languages:{eng:"Angličtina"}},
         {name:{common:"Slovensko"},cca2:"SK",cca3:"SVK",capital:["Bratislava"],population:5458827,area:49037,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{slk:"Slovenština"}},
-        {name:{common:"Slovinsko"},cca2:"SI",cca3:"SVN",capital:["Lublaň"],population:2100126,area:20273,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{slv:"Slovinština"}},
-        {name:{common:"Spojené arabské emiráty"},cca2:"AE",cca3:"ARE",capital:["Abú Zabí"],population:9890402,area:83600,region:"Asia",currencies:{AED:{name:"Dirham"}},languages:{ara:"Arabština"}},
         {name:{common:"Spojené státy"},cca2:"US",cca3:"USA",capital:["Washington, D.C."],population:329484123,area:9372610,region:"Americas",currencies:{USD:{name:"Americký dolar"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Srbsko"},cca2:"RS",cca3:"SRB",capital:["Bělehrad"],population:6908224,area:88361,region:"Europe",currencies:{RSD:{name:"Srbský dinár"}},languages:{srp:"Srbština"}},
-        {name:{common:"Srí Lanka"},cca2:"LK",cca3:"LKA",capital:["Kotte"],population:21919000,area:65610,region:"Asia",currencies:{LKR:{name:"Srílanská rupie"}},languages:{sin:"Sinhálština"}},
         {name:{common:"Španělsko"},cca2:"ES",cca3:"ESP",capital:["Madrid"],population:47351567,area:505992,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{spa:"Španělština"}},
-        {name:{common:"Švédsko"},cca2:"SE",cca3:"SWE",capital:["Stockholm"],population:10353442,area:450295,region:"Europe",currencies:{SEK:{name:"Švédská koruna"}},languages:{swe:"Švédština"}},
-        {name:{common:"Švýcarsko"},cca2:"CH",cca3:"CHE",capital:["Bern"],population:8636896,area:41284,region:"Europe",currencies:{CHF:{name:"Švýcarský frank"}},languages:{deu:"Němčina",fra:"Francouzština"}},
-        {name:{common:"Thajsko"},cca2:"TH",cca3:"THA",capital:["Bangkok"],population:69799978,area:513120,region:"Asia",currencies:{THB:{name:"Baht"}},languages:{tha:"Thajština"}},
-        {name:{common:"Tunisko"},cca2:"TN",cca3:"TUN",capital:["Tunis"],population:11818619,area:163610,region:"Africa",currencies:{TND:{name:"Tuniský dinár"}},languages:{ara:"Arabština"}},
-        {name:{common:"Turecko"},cca2:"TR",cca3:"TUR",capital:["Ankara"],population:84339067,area:783562,region:"Asia",currencies:{TRY:{name:"Lira"}},languages:{tur:"Turečtina"}},
-        {name:{common:"Ukrajina"},cca2:"UA",cca3:"UKR",capital:["Kyjev"],population:44134693,area:603500,region:"Europe",currencies:{UAH:{name:"Hřivna"}},languages:{ukr:"Ukrajinština"}},
-        {name:{common:"Uruguay"},cca2:"UY",cca3:"URY",capital:["Montevideo"],population:3473730,area:176215,region:"Americas",currencies:{UYU:{name:"Uruguayské peso"}},languages:{spa:"Španělština"}},
-        {name:{common:"Uzbekistán"},cca2:"UZ",cca3:"UZB",capital:["Taškent"],population:34232050,area:447400,region:"Asia",currencies:{UZS:{name:"Sum"}},languages:{uzb:"Uzbečtina"}},
-        {name:{common:"Vatikán"},cca2:"VA",cca3:"VAT",capital:["Vatikán"],population:800,area:1,region:"Europe",currencies:{EUR:{name:"Euro"}},languages:{ita:"Italština"}},
-        {name:{common:"Velká Británie"},cca2:"GB",cca3:"GBR",capital:["Londýn"],population:67215293,area:242900,region:"Europe",currencies:{GBP:{name:"Libra"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Venezuela"},cca2:"VE",cca3:"VEN",capital:["Caracas"],population:28435943,area:916445,region:"Americas",currencies:{VES:{name:"Bolívar"}},languages:{spa:"Španělština"}},
-        {name:{common:"Vietnam"},cca2:"VN",cca3:"VNM",capital:["Hanoj"],population:97338579,area:331212,region:"Asia",currencies:{VND:{name:"Dong"}},languages:{vie:"Vietnamština"}},
-        {name:{common:"Zambie"},cca2:"ZM",cca3:"ZMB",capital:["Lusaka"],population:18383955,area:752612,region:"Africa",currencies:{ZMW:{name:"Kwacha"}},languages:{eng:"Angličtina"}},
-        {name:{common:"Zimbabwe"},cca2:"ZW",cca3:"ZWE",capital:["Harare"],population:14862924,area:390757,region:"Africa",currencies:{ZWL:{name:"Zimbabwský dolar"}},languages:{eng:"Angličtina"}}
+        {name:{common:"Velká Británie"},cca2:"GB",cca3:"GBR",capital:["Londýn"],population:67215293,area:242900,region:"Europe",currencies:{GBP:{name:"Libra"}},languages:{eng:"Angličtina"}}
       ];
     }
 
