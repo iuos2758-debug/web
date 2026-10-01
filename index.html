@@ -64,7 +64,7 @@
   </header>
 
   <div class="user-info" id="userInfo">
-    Načítám výchozí nastavení...
+    Načítám nastavení...
   </div>
 
   <div class="controls">
@@ -93,86 +93,99 @@
     let exchangeRates = {};
 
     async function init() {
-      // 1. Zjistíme IP a kurzy (selhání neblokuje zobrazení zemí)
-      await fetchUserLocation();
-      await fetchExchangeRates();
-
-      // 2. Načteme země s fallbackem na CDN zrcadlo
-      await fetchCountriesWithFallback();
+      // Nenačítání IP nesmí zablokovat aplikaci
+      fetchUserLocation().then(() => fetchExchangeRates());
+      
+      // Načteme data o zemích
+      await fetchCountries();
     }
 
     async function fetchUserLocation() {
       try {
         const res = await fetch('https://ipapi.co/json/');
-        if (!res.ok) throw new Error('IP API nedostupné');
-        const data = await res.json();
-        if (data && data.currency) {
-          userCurrency = data.currency;
-          userCountry = data.country_code;
-          document.getElementById('userInfo').innerHTML = `📍 Vaše poloha: <strong>${data.country_name || 'Neznámá'} (${userCountry})</strong> | Měna: <strong>${userCurrency}</strong>`;
-          return;
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.currency) {
+            userCurrency = data.currency;
+            userCountry = data.country_code;
+            document.getElementById('userInfo').innerHTML = `📍 Vaše poloha: <strong>${data.country_name || 'Neznámá'} (${userCountry})</strong> | Měna: <strong>${userCurrency}</strong>`;
+            return;
+          }
         }
       } catch (e) {
-        console.warn("Lokalizace selhala, používám CZK/CZ:", e);
+        console.warn("Lokalizace se nezdařila:", e);
       }
-      document.getElementById('userInfo').innerHTML = `📍 Nastavena výchozí měna: <strong>${userCurrency}</strong>`;
+      document.getElementById('userInfo').innerHTML = `📍 Nastavena měna: <strong>${userCurrency}</strong>`;
     }
 
     async function fetchExchangeRates() {
       try {
         const res = await fetch(`https://open.er-api.com/v6/latest/${userCurrency}`);
-        if (!res.ok) throw new Error('Kurzovní API nedostupné');
-        const data = await res.json();
-        if (data && data.rates) {
-          exchangeRates = data.rates;
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.rates) {
+            exchangeRates = data.rates;
+            // Obnovíme zobrazení pokud už je země vykreslená
+            const currentCca3 = document.getElementById('countrySelect').value;
+            if (currentCca3) {
+              const selected = countriesData.find(c => (c.cca3 || c.alpha3Code) === currentCca3);
+              if (selected) renderCountryDetail(selected);
+            }
+          }
         }
       } catch (e) {
-        console.warn("Kurzy měn se nepodařilo načíst:", e);
+        console.warn("Kurzy nedostupné:", e);
       }
     }
 
-    async function fetchCountriesWithFallback() {
+    async function fetchCountries() {
+      // 3 různé vysoce dostupné zdroje dat pro 100% spolehlivost
       const apiSources = [
-        'https://restcountries.com/v3.1/all?fields=name,cca2,cca3,capital,population,area,region,subregion,flags,coatOfArms,currencies,languages,latlng,maps',
-        'https://cdn.jsdelivr.net/npm/restcountries-api-data@3.1.0/all.json'
+        'https://cdn.jsdelivr.net/npm/restcountries-api-data@3.1.0/all.json',
+        'https://raw.githubusercontent.com/mledoze/countries/master/dist/countries.json',
+        'https://restcountries.com/v3.1/all'
       ];
 
       for (const url of apiSources) {
         try {
           const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP chyba ${res.status}`);
-          const data = await res.json();
-
-          if (Array.isArray(data) && data.length > 0) {
-            countriesData = data;
-            break;
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              countriesData = data;
+              break;
+            }
           }
         } catch (e) {
-          console.warn(`Aplikace selhala při načítání z ${url}:`, e);
+          console.warn(`Nepodařilo se načíst z ${url}:`, e);
         }
       }
 
       if (countriesData.length === 0) {
         document.getElementById('app').innerHTML = `
           <div class="loading" style="color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px;">
-            ⚠️ <strong>Chyba při načítání dat o zemích.</strong><br>
-            Ujistěte se, že jste připojeni k internetu, nebo zkuste vypnout blokovače reklamy (AdBlock).
+            ⚠️ <strong>Chyba při načítání dat.</strong> Zkuste obnovit stránku za několik sekund.
           </div>`;
         return;
       }
 
-      // Seřazení zemí podle názvu
-      countriesData.sort((a, b) => (a.name?.common || '').localeCompare(b.name?.common || ''));
+      // Seřazení podle jména
+      countriesData.sort((a, b) => {
+        const nameA = a.name?.common || a.name || '';
+        const nameB = b.name?.common || b.name || '';
+        return nameA.localeCompare(nameB);
+      });
 
       populateSelect(countriesData);
 
-      // Vybereme výchozí zemi
-      const initialCountry = countriesData.find(c => c.cca2 === userCountry) || 
-                             countriesData.find(c => c.cca2 === 'CZ') || 
+      // Vybereme výchozí zemi (CZ nebo první)
+      const initialCountry = countriesData.find(c => (c.cca2 || c.alpha2Code) === userCountry) || 
+                             countriesData.find(c => (c.cca2 || c.alpha2Code) === 'CZ') || 
                              countriesData[0];
       
       if (initialCountry) {
-        document.getElementById('countrySelect').value = initialCountry.cca3;
+        const code = initialCountry.cca3 || initialCountry.alpha3Code;
+        document.getElementById('countrySelect').value = code;
         renderCountryDetail(initialCountry);
       }
     }
@@ -182,8 +195,11 @@
       select.innerHTML = '';
       countries.forEach(c => {
         const opt = document.createElement('option');
-        opt.value = c.cca3;
-        opt.textContent = `${c.name?.common || 'Neznámý stát'} (${c.name?.official || ''})`;
+        const code = c.cca3 || c.alpha3Code;
+        const commonName = c.name?.common || c.name || 'Neznámý stát';
+        const officialName = c.name?.official || c.officialName || '';
+        opt.value = code;
+        opt.textContent = officialName ? `${commonName} (${officialName})` : commonName;
         select.appendChild(opt);
       });
     }
@@ -194,39 +210,62 @@
       let currencyText = "Není k dispozici";
       let conversionText = "";
 
+      // Zpracování měny z různých formátů API
       if (country.currencies) {
-        const currKeys = Object.keys(country.currencies);
-        currencyText = currKeys.map(k => `${country.currencies[k].name || k} (${country.currencies[k].symbol || k})`).join(', ');
-
-        const mainCurrKey = currKeys[0];
-        if (exchangeRates[mainCurrKey]) {
-          const rateToUser = (1 / exchangeRates[mainCurrKey]).toFixed(2);
-          conversionText = `1 ${mainCurrKey} ≈ <strong>${rateToUser} ${userCurrency}</strong>`;
-        } else if (mainCurrKey === userCurrency) {
-          conversionText = `Domovská měna (1 ${mainCurrKey} = 1 ${userCurrency})`;
+        if (Array.isArray(country.currencies)) {
+          currencyText = country.currencies.map(c => `${c.name} (${c.symbol || c.code})`).join(', ');
+          const first = country.currencies[0]?.code;
+          if (first && exchangeRates[first]) {
+            const rate = (1 / exchangeRates[first]).toFixed(2);
+            conversionText = `1 ${first} ≈ <strong>${rate} ${userCurrency}</strong>`;
+          }
+        } else {
+          const currKeys = Object.keys(country.currencies);
+          currencyText = currKeys.map(k => `${country.currencies[k].name || k} (${country.currencies[k].symbol || k})`).join(', ');
+          const mainCurrKey = currKeys[0];
+          if (exchangeRates[mainCurrKey]) {
+            const rateToUser = (1 / exchangeRates[mainCurrKey]).toFixed(2);
+            conversionText = `1 ${mainCurrKey} ≈ <strong>${rateToUser} ${userCurrency}</strong>`;
+          } else if (mainCurrKey === userCurrency) {
+            conversionText = `Domovská měna (1 ${mainCurrKey} = 1 ${userCurrency})`;
+          }
         }
       }
 
-      const languages = country.languages ? Object.values(country.languages).join(', ') : 'Neuvedeno';
-      const capital = country.capital ? country.capital.join(', ') : 'Neuvedeno';
-      const flagSrc = country.flags?.svg || country.flags?.png || '';
+      // Jazyky
+      let languages = 'Neuvedeno';
+      if (country.languages) {
+        languages = Array.isArray(country.languages) 
+          ? country.languages.map(l => l.name || l).join(', ') 
+          : Object.values(country.languages).join(', ');
+      }
+
+      // Hlavní město
+      const capital = Array.isArray(country.capital) ? country.capital.join(', ') : (country.capital || 'Neuvedeno');
+
+      // Vlajky a znak
+      const flagSrc = country.flags?.svg || country.flags?.png || country.flag || '';
       const coatSrc = country.coatOfArms?.svg || country.coatOfArms?.png || '';
 
+      // Souřadnice & Mapy
       const lat = country.latlng ? country.latlng[0] : 0;
       const lng = country.latlng ? country.latlng[1] : 0;
       const mapEmbedUrl = `https://maps.google.com/maps?q=${lat},${lng}&z=4&output=embed`;
       const googleMapsUrl = country.maps?.googleMaps || `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
+      const commonName = country.name?.common || country.name || 'Neznámý stát';
+      const officialName = country.name?.official || country.officialName || '';
+
       app.innerHTML = `
         <div class="country-card">
           <div class="flag-section">
-            ${flagSrc ? `<img class="flag" src="${flagSrc}" alt="Vlajka ${country.name?.common}">` : 'Bez vlajky'}
+            ${flagSrc ? `<img class="flag" src="${flagSrc}" alt="Vlajka ${commonName}">` : 'Bez vlajky'}
             ${coatSrc ? `<br><img class="coat" src="${coatSrc}" alt="Státní znak">` : ''}
           </div>
           
           <div class="details-section">
-            <h2>${country.name?.common || 'Neznámý stát'}</h2>
-            <div class="official-name">${country.name?.official || ''}</div>
+            <h2>${commonName}</h2>
+            <div class="official-name">${officialName}</div>
 
             <div class="currency-box">
               💱 <strong>Měna: ${currencyText}</strong>
@@ -267,16 +306,17 @@
     }
 
     document.getElementById('countrySelect').addEventListener('change', (e) => {
-      const selected = countriesData.find(c => c.cca3 === e.target.value);
+      const selected = countriesData.find(c => (c.cca3 || c.alpha3Code) === e.target.value);
       if (selected) renderCountryDetail(selected);
     });
 
     document.getElementById('searchInput').addEventListener('input', (e) => {
       const term = e.target.value.toLowerCase().trim();
-      const filtered = countriesData.filter(c => 
-        (c.name?.common && c.name.common.toLowerCase().includes(term)) || 
-        (c.name?.official && c.name.official.toLowerCase().includes(term))
-      );
+      const filtered = countriesData.filter(c => {
+        const cName = c.name?.common || c.name || '';
+        const oName = c.name?.official || c.officialName || '';
+        return cName.toLowerCase().includes(term) || oName.toLowerCase().includes(term);
+      });
       populateSelect(filtered);
       if (filtered.length > 0) renderCountryDetail(filtered[0]);
     });
