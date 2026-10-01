@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Světový Atlas - Přehled zemí světa</title>
+  <style>
+    :root {
+      --bg-color: #f4f7f6;
+      --card-bg: #ffffff;
+      --primary: #2563eb;
+      --text-main: #1f2937;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; line-height: 1.6; }
+
+    header { text-align: center; margin-bottom: 20px; }
+    header h1 { font-size: 2.2rem; color: #1e3a8a; margin-bottom: 8px; }
+    header p { color: var(--text-muted); }
+
+    .user-info { background: #dbeafe; color: #1e40af; padding: 10px 15px; border-radius: 8px; max-width: 900px; margin: 0 auto 20px auto; font-size: 0.9rem; text-align: center; }
+
+    .controls { display: flex; gap: 15px; max-width: 900px; margin: 0 auto 30px auto; flex-wrap: wrap; }
+    .controls input, .controls select { flex: 1; min-width: 200px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; }
+    .controls input:focus, .controls select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.2); }
+
+    .container { max-width: 900px; margin: 0 auto; }
+    
+    .loading { text-align: center; padding: 50px; font-size: 1.2rem; color: var(--text-muted); }
+
+    .country-card { background: var(--card-bg); border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: grid; grid-template-columns: 1fr 1.5fr; gap: 25px; margin-bottom: 30px; }
+    @media (max-width: 768px) { .country-card { grid-template-columns: 1fr; } }
+
+    .flag-section { text-align: center; }
+    .flag-section img.flag { width: 100%; max-width: 300px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .flag-section .coat { width: 60px; margin-top: 15px; opacity: 0.8; }
+
+    .details-section h2 { font-size: 2rem; color: #111827; margin-bottom: 5px; }
+    .details-section .official-name { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 15px; font-style: italic; }
+
+    .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .info-item { background: #f9fafb; padding: 10px; border-radius: 6px; border: 1px solid var(--border); }
+    .info-item label { display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+    .info-item span { font-weight: 600; color: #374151; font-size: 1rem; }
+
+    .currency-box { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 12px; border-radius: 8px; margin-bottom: 15px; }
+    .currency-box strong { display: block; font-size: 1.05rem; }
+
+    .map-btn { display: inline-block; background: var(--primary); color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; transition: background 0.2s; }
+    .map-btn:hover { background: #1d4ed8; }
+
+    .map-frame { margin-top: 20px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); height: 250px; }
+    .map-frame iframe { width: 100%; height: 100%; border: 0; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🌍 Světový Atlas Zemí</h1>
+    <p>Aktuální přehled o všech státech světa pro cestovatele i studenty</p>
+  </header>
+
+  <div class="user-info" id="userInfo">
+    Načítám výchozí nastavení...
+  </div>
+
+  <div class="controls">
+    <select id="countrySelect">
+      <option value="">-- Načítám seznam zemí... --</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="🔎 Rychlé vyhledávání země...">
+    <select id="regionFilter">
+      <option value="ALL">Všechny kontinenty</option>
+      <option value="Europe">Evropa</option>
+      <option value="Asia">Asie</option>
+      <option value="Africa">Afrika</option>
+      <option value="Americas">Amerika</option>
+      <option value="Oceania">Oceánie</option>
+    </select>
+  </div>
+
+  <div class="container" id="app">
+    <div class="loading" id="loadingText">Načítám data o zemích světa...</div>
+  </div>
+
+  <script>
+    let countriesData = [];
+    let userCurrency = 'CZK';
+    let userCountry = 'CZ';
+    let exchangeRates = {};
+
+    async function init() {
+      // 1. Zjistíme IP a kurzy (selhání neblokuje zobrazení zemí)
+      await fetchUserLocation();
+      await fetchExchangeRates();
+
+      // 2. Načteme země s fallbackem na CDN zrcadlo
+      await fetchCountriesWithFallback();
+    }
+
+    async function fetchUserLocation() {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (!res.ok) throw new Error('IP API nedostupné');
+        const data = await res.json();
+        if (data && data.currency) {
+          userCurrency = data.currency;
+          userCountry = data.country_code;
+          document.getElementById('userInfo').innerHTML = `📍 Vaše poloha: <strong>${data.country_name || 'Neznámá'} (${userCountry})</strong> | Měna: <strong>${userCurrency}</strong>`;
+          return;
+        }
+      } catch (e) {
+        console.warn("Lokalizace selhala, používám CZK/CZ:", e);
+      }
+      document.getElementById('userInfo').innerHTML = `📍 Nastavena výchozí měna: <strong>${userCurrency}</strong>`;
+    }
+
+    async function fetchExchangeRates() {
+      try {
+        const res = await fetch(`https://open.er-api.com/v6/latest/${userCurrency}`);
+        if (!res.ok) throw new Error('Kurzovní API nedostupné');
+        const data = await res.json();
+        if (data && data.rates) {
+          exchangeRates = data.rates;
+        }
+      } catch (e) {
+        console.warn("Kurzy měn se nepodařilo načíst:", e);
+      }
+    }
+
+    async function fetchCountriesWithFallback() {
+      const apiSources = [
+        'https://restcountries.com/v3.1/all?fields=name,cca2,cca3,capital,population,area,region,subregion,flags,coatOfArms,currencies,languages,latlng,maps',
+        'https://cdn.jsdelivr.net/npm/restcountries-api-data@3.1.0/all.json'
+      ];
+
+      for (const url of apiSources) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP chyba ${res.status}`);
+          const data = await res.json();
+
+          if (Array.isArray(data) && data.length > 0) {
+            countriesData = data;
+            break;
+          }
+        } catch (e) {
+          console.warn(`Aplikace selhala při načítání z ${url}:`, e);
+        }
+      }
+
+      if (countriesData.length === 0) {
+        document.getElementById('app').innerHTML = `
+          <div class="loading" style="color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px;">
+            ⚠️ <strong>Chyba při načítání dat o zemích.</strong><br>
+            Ujistěte se, že jste připojeni k internetu, nebo zkuste vypnout blokovače reklamy (AdBlock).
+          </div>`;
+        return;
+      }
+
+      // Seřazení zemí podle názvu
+      countriesData.sort((a, b) => (a.name?.common || '').localeCompare(b.name?.common || ''));
+
+      populateSelect(countriesData);
+
+      // Vybereme výchozí zemi
+      const initialCountry = countriesData.find(c => c.cca2 === userCountry) || 
+                             countriesData.find(c => c.cca2 === 'CZ') || 
+                             countriesData[0];
+      
+      if (initialCountry) {
+        document.getElementById('countrySelect').value = initialCountry.cca3;
+        renderCountryDetail(initialCountry);
+      }
+    }
+
+    function populateSelect(countries) {
+      const select = document.getElementById('countrySelect');
+      select.innerHTML = '';
+      countries.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.cca3;
+        opt.textContent = `${c.name?.common || 'Neznámý stát'} (${c.name?.official || ''})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function renderCountryDetail(country) {
+      const app = document.getElementById('app');
+      
+      let currencyText = "Není k dispozici";
+      let conversionText = "";
+
+      if (country.currencies) {
+        const currKeys = Object.keys(country.currencies);
+        currencyText = currKeys.map(k => `${country.currencies[k].name || k} (${country.currencies[k].symbol || k})`).join(', ');
+
+        const mainCurrKey = currKeys[0];
+        if (exchangeRates[mainCurrKey]) {
+          const rateToUser = (1 / exchangeRates[mainCurrKey]).toFixed(2);
+          conversionText = `1 ${mainCurrKey} ≈ <strong>${rateToUser} ${userCurrency}</strong>`;
+        } else if (mainCurrKey === userCurrency) {
+          conversionText = `Domovská měna (1 ${mainCurrKey} = 1 ${userCurrency})`;
+        }
+      }
+
+      const languages = country.languages ? Object.values(country.languages).join(', ') : 'Neuvedeno';
+      const capital = country.capital ? country.capital.join(', ') : 'Neuvedeno';
+      const flagSrc = country.flags?.svg || country.flags?.png || '';
+      const coatSrc = country.coatOfArms?.svg || country.coatOfArms?.png || '';
+
+      const lat = country.latlng ? country.latlng[0] : 0;
+      const lng = country.latlng ? country.latlng[1] : 0;
+      const mapEmbedUrl = `https://maps.google.com/maps?q=${lat},${lng}&z=4&output=embed`;
+      const googleMapsUrl = country.maps?.googleMaps || `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
+      app.innerHTML = `
+        <div class="country-card">
+          <div class="flag-section">
+            ${flagSrc ? `<img class="flag" src="${flagSrc}" alt="Vlajka ${country.name?.common}">` : 'Bez vlajky'}
+            ${coatSrc ? `<br><img class="coat" src="${coatSrc}" alt="Státní znak">` : ''}
+          </div>
+          
+          <div class="details-section">
+            <h2>${country.name?.common || 'Neznámý stát'}</h2>
+            <div class="official-name">${country.name?.official || ''}</div>
+
+            <div class="currency-box">
+              💱 <strong>Měna: ${currencyText}</strong>
+              ${conversionText ? `<div style="margin-top: 4px; font-size: 0.9rem;">${conversionText}</div>` : ''}
+            </div>
+
+            <div class="grid-info">
+              <div class="info-item">
+                <label>Hlavní město</label>
+                <span>${capital}</span>
+              </div>
+              <div class="info-item">
+                <label>Populace</label>
+                <span>${country.population ? country.population.toLocaleString('cs-CZ') : 'Neuvedeno'}</span>
+              </div>
+              <div class="info-item">
+                <label>Rozloha</label>
+                <span>${country.area ? country.area.toLocaleString('cs-CZ') + ' km²' : 'Neuvedeno'}</span>
+              </div>
+              <div class="info-item">
+                <label>Region</label>
+                <span>${country.region || 'Neuvedeno'} (${country.subregion || ''})</span>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+              <strong>🗣 Jazyky:</strong> ${languages}
+            </div>
+
+            <a class="map-btn" href="${googleMapsUrl}" target="_blank" rel="noopener">🗺 Otevřít v Google Mapách ↗</a>
+          </div>
+        </div>
+
+        <div class="map-frame">
+          <iframe src="${mapEmbedUrl}" loading="lazy"></iframe>
+        </div>
+      `;
+    }
+
+    document.getElementById('countrySelect').addEventListener('change', (e) => {
+      const selected = countriesData.find(c => c.cca3 === e.target.value);
+      if (selected) renderCountryDetail(selected);
+    });
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase().trim();
+      const filtered = countriesData.filter(c => 
+        (c.name?.common && c.name.common.toLowerCase().includes(term)) || 
+        (c.name?.official && c.name.official.toLowerCase().includes(term))
+      );
+      populateSelect(filtered);
+      if (filtered.length > 0) renderCountryDetail(filtered[0]);
+    });
+
+    document.getElementById('regionFilter').addEventListener('change', (e) => {
+      const region = e.target.value;
+      const filtered = region === 'ALL' ? countriesData : countriesData.filter(c => c.region === region);
+      populateSelect(filtered);
+      if (filtered.length > 0) renderCountryDetail(filtered[0]);
+    });
+
+    init();
+  </script>
+</body>
+</html>
